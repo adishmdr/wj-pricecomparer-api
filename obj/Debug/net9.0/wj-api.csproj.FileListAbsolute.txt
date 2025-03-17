@@ -58,3 +58,4 @@
 /Users/adishmanandhar/Development/wj-price-comparer/wj-api/obj/Debug/net9.0/wj-api.pdb
 /Users/adishmanandhar/Development/wj-price-comparer/wj-api/obj/Debug/net9.0/wj-api.genruntimeconfig.cache
 /Users/adishmanandhar/Development/wj-price-comparer/wj-api/obj/Debug/net9.0/ref/wj-api.dll
+/Users/adishmanandhar/Development/wj-price-comparer/wj-api/obj/Debug/net9.0/wj-api.sourcelink.json
