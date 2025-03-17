@@ -1,4 +1,4 @@
-// wj-api/Services/IMovieService.cs
+
 using Microsoft.AspNetCore.Http;
 using wj_api.Models;
 

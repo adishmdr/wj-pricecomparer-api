@@ -1,4 +1,4 @@
-// wj-api/Models/Movie.cs
+
 using System.Text.Json.Serialization;
 
 namespace wj_api.Models

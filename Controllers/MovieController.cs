@@ -1,4 +1,4 @@
-// wj-api/Controllers/MovieController.cs
+
 using Microsoft.AspNetCore.Mvc;
 using wj_api.Services;
 using Microsoft.AspNetCore.Http;
