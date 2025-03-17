@@ -1,4 +1,4 @@
-// wj-api/Program.cs
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
@@ -41,8 +41,7 @@ builder.Services.AddLogging(logging =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-// app.UseHttpsRedirection(); // Comment out or remove this line
+
 app.UseCors("AllowReactApp");
 app.UseAuthorization();
 app.MapControllers();

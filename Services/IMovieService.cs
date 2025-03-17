@@ -6,7 +6,7 @@ namespace wj_api.Services
 {
     public interface IMovieService
     {
-        Task<List<MovieComparison>> GetMoviesAsync(IHttpContextAccessor httpContextAccessor);
+        Task<List<MovieComparison>> GetMoviesAsync(IHttpContextAccessor httpContextAccessor, bool forceRefresh = false);
         Task<MovieComparison> CompareMovieAsync(string cinemaWorldId, string filmWorldId, IHttpContextAccessor httpContextAccessor);
     }
 }

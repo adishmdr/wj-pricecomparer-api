@@ -26,7 +26,7 @@ namespace wj_api.Controllers
         }
 
         [HttpGet("compare")]
-        public async Task<IActionResult> CompareMovie([FromQuery] string cinemaWorldId, [FromQuery] string filmWorldId)
+        public async Task<IActionResult> CompareMovie([FromQuery] string? cinemaWorldId, [FromQuery] string? filmWorldId)
         {
             try
             {

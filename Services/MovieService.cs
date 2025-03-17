@@ -39,16 +39,19 @@ namespace wj_api.Services
                 new JsonSerializerOptions { WriteIndented = true }));
         }
 
-        public async Task<List<MovieComparison>> GetMoviesAsync(IHttpContextAccessor httpContextAccessor)
+        public async Task<List<MovieComparison>> GetMoviesAsync(IHttpContextAccessor httpContextAccessor, bool forceRefresh = false)
         {
             const string cacheKey = "AllMovies";
 
-            if (_cache.TryGetValue(cacheKey, out List<MovieComparison>? cachedMovies) && cachedMovies != null)
+            // Check cache if not forcing a refresh
+            if (!forceRefresh && _cache.TryGetValue(cacheKey, out List<MovieComparison>? cachedMovies) && cachedMovies != null)
             {
-                _logger.LogInformation("Returning cached movies:");
+                _logger.LogInformation("Cache hit for key {CacheKey}. Returning cached movies:", cacheKey);
                 _logger.LogInformation(JsonSerializer.Serialize(cachedMovies, new JsonSerializerOptions { WriteIndented = true }));
                 return cachedMovies;
             }
+
+            _logger.LogInformation("Cache miss or forced refresh for key {CacheKey}. Fetching new data...", cacheKey);
 
             var token = httpContextAccessor.HttpContext?.Request.Headers["x-access-token"].FirstOrDefault();
             if (string.IsNullOrEmpty(token))
@@ -62,6 +65,7 @@ namespace wj_api.Services
 
             var cinemaWorldMovies = await FetchMoviesAsync(_cinemaWorldClient, "cinemaworld", token);
             var filmWorldMovies = await FetchMoviesAsync(_filmWorldClient, "filmworld", token);
+            
 
             // Group movies by title
             var allTitles = cinemaWorldMovies.Select(m => m.Title)
@@ -79,7 +83,6 @@ namespace wj_api.Services
                     FilmWorldMovie = filmWorldMovies.FirstOrDefault(m => m.Title == title)
                 };
 
-                // Only add if at least one movie is non-null
                 if (comparison.CinemaWorldMovie != null || comparison.FilmWorldMovie != null)
                 {
                     comparisons.Add(comparison);
@@ -89,62 +92,74 @@ namespace wj_api.Services
             _logger.LogInformation("All Movies (Grouped):");
             _logger.LogInformation(JsonSerializer.Serialize(comparisons, new JsonSerializerOptions { WriteIndented = true }));
 
-            _cache.Set(cacheKey, comparisons, TimeSpan.FromMinutes(30));
+            if (cinemaWorldMovies.Any() && filmWorldMovies.Any())
+            {
+                _logger.LogInformation("Caching data for key {CacheKey} as both CinemaWorld and FilmWorld have data.", cacheKey);
+                _cache.Set(cacheKey, comparisons, TimeSpan.FromMinutes(5));
+            }
+            else
+            {
+                _logger.LogWarning("Skipping cache for key {CacheKey} as one or both datasets (CinemaWorld or FilmWorld) are empty.", cacheKey);
+            }
+
             return comparisons;
         }
 
-        public async Task<MovieComparison> CompareMovieAsync(string cinemaWorldId, string filmWorldId, IHttpContextAccessor httpContextAccessor)
+       public async Task<MovieComparison> CompareMovieAsync(string? cinemaWorldId, string? filmWorldId, IHttpContextAccessor httpContextAccessor)
+{
+    var token = httpContextAccessor.HttpContext?.Request.Headers["x-access-token"].FirstOrDefault();
+    if (string.IsNullOrEmpty(token))
+    {
+        _logger.LogWarning("No x-access-token provided in request headers.");
+    }
+    else
+    {
+        _logger.LogDebug("Using x-access-token: {Token}", token);
+    }
+
+    Movie? cinemaWorldMovie = null;
+    Movie? filmWorldMovie = null;
+
+    // Fetch details only if an ID is provided
+    if (!string.IsNullOrEmpty(cinemaWorldId))
+    {
+        cinemaWorldMovie = await FetchMovieDetailsAsync(_cinemaWorldClient, "cinemaworld", cinemaWorldId, token);
+    }
+
+    if (!string.IsNullOrEmpty(filmWorldId))
+    {
+        filmWorldMovie = await FetchMovieDetailsAsync(_filmWorldClient, "filmworld", filmWorldId, token);
+    }
+
+    var comparison = new MovieComparison();
+
+    // Populate comparison based on available data
+    if (cinemaWorldMovie != null && filmWorldMovie != null && cinemaWorldMovie.Title == filmWorldMovie.Title)
+    {
+        comparison.Title = cinemaWorldMovie.Title;
+        comparison.CinemaWorldMovie = cinemaWorldMovie;
+        comparison.FilmWorldMovie = filmWorldMovie;
+    }
+    else
+    {
+        if (cinemaWorldMovie != null)
         {
-            if (string.IsNullOrEmpty(cinemaWorldId) || string.IsNullOrEmpty(filmWorldId))
-            {
-                throw new ArgumentException("Both CinemaWorld and FilmWorld IDs must be provided.");
-            }
-
-            var token = httpContextAccessor.HttpContext?.Request.Headers["x-access-token"].FirstOrDefault();
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning("No x-access-token provided in request headers.");
-            }
-            else
-            {
-                _logger.LogDebug("Using x-access-token: {Token}", token);
-            }
-
-            var cinemaWorldMovie = await FetchMovieDetailsAsync(_cinemaWorldClient, "cinemaworld", cinemaWorldId, token);
-            var filmWorldMovie = await FetchMovieDetailsAsync(_filmWorldClient, "filmworld", filmWorldId, token);
-
-            if (cinemaWorldMovie == null && filmWorldMovie == null)
-            {
-                throw new ArgumentException("No movies found for the provided IDs.");
-            }
-
-            var comparison = new MovieComparison();
-
-            if (cinemaWorldMovie?.Title == filmWorldMovie?.Title && cinemaWorldMovie != null && filmWorldMovie != null)
-            {
-                comparison.Title = cinemaWorldMovie.Title;
-                comparison.CinemaWorldMovie = cinemaWorldMovie;
-                comparison.FilmWorldMovie = filmWorldMovie;
-            }
-            else
-            {
-                if (cinemaWorldMovie != null)
-                {
-                    comparison.Title = cinemaWorldMovie.Title;
-                    comparison.CinemaWorldMovie = cinemaWorldMovie;
-                }
-                else if (filmWorldMovie != null)
-                {
-                    comparison.Title = filmWorldMovie.Title;
-                    comparison.FilmWorldMovie = filmWorldMovie;
-                }
-            }
-
-            _logger.LogInformation("Movie Comparison:");
-            _logger.LogInformation(JsonSerializer.Serialize(comparison, new JsonSerializerOptions { WriteIndented = true }));
-
-            return comparison;
+            comparison.Title = cinemaWorldMovie.Title;
+            comparison.CinemaWorldMovie = cinemaWorldMovie;
         }
+        if (filmWorldMovie != null)
+        {
+            comparison.Title = filmWorldMovie.Title ?? comparison.Title; // Use existing title if set, otherwise use filmWorldMovie title
+            comparison.FilmWorldMovie = filmWorldMovie;
+        }
+        // If both are null, comparison will have null movies, but we proceed
+    }
+
+    _logger.LogInformation("Movie Comparison:");
+    _logger.LogInformation(JsonSerializer.Serialize(comparison, new JsonSerializerOptions { WriteIndented = true }));
+
+    return comparison;
+}
 
         private async Task<List<Movie>> FetchMoviesAsync(HttpClient client, string provider, string? token)
         {
