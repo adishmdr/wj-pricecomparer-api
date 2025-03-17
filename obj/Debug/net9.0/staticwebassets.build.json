@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "TLNKfQTf1mYVr8W3jkrKI0NvWrko5GKl4NUG/n4nx4c=",
+  "Source": "wj-api",
+  "BasePath": "_content/wj-api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
