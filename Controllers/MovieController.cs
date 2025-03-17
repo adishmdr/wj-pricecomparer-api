@@ -1,6 +1,7 @@
 // wj-api/Controllers/MovieController.cs
 using Microsoft.AspNetCore.Mvc;
 using wj_api.Services;
+using Microsoft.AspNetCore.Http;
 
 namespace wj_api.Controllers
 {
@@ -9,17 +10,18 @@ namespace wj_api.Controllers
     public class MovieController : ControllerBase
     {
         private readonly IMovieService _movieService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public MovieController(IMovieService movieService)
+        public MovieController(IMovieService movieService, IHttpContextAccessor httpContextAccessor)
         {
             _movieService = movieService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpGet("movies")]
         public async Task<IActionResult> GetMovies()
         {
-            Console.WriteLine("GetMovies endpoint hit from: " + HttpContext.Request.Headers["Origin"]);
-            var movies = await _movieService.GetMoviesAsync();
+            var movies = await _movieService.GetMoviesAsync(_httpContextAccessor);
             return Ok(movies);
         }
 
@@ -28,7 +30,7 @@ namespace wj_api.Controllers
         {
             try
             {
-                var comparison = await _movieService.CompareMovieAsync(cinemaWorldId, filmWorldId);
+                var comparison = await _movieService.CompareMovieAsync(cinemaWorldId, filmWorldId, _httpContextAccessor);
                 return Ok(comparison);
             }
             catch (ArgumentException ex)

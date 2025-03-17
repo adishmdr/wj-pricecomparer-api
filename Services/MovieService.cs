@@ -1,4 +1,5 @@
 // wj-api/Services/MovieService.cs
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -30,18 +31,18 @@ namespace wj_api.Services
             _cinemaWorldClient = httpClientFactory.CreateClient("CinemaWorld");
             _filmWorldClient = httpClientFactory.CreateClient("FilmWorld");
 
-            _logger.LogDebug("CinemaWorld Client Headers: {Headers}", 
-                JsonSerializer.Serialize(_cinemaWorldClient.DefaultRequestHeaders, 
+            _logger.LogDebug("CinemaWorld Client Headers: {Headers}",
+                JsonSerializer.Serialize(_cinemaWorldClient.DefaultRequestHeaders,
                 new JsonSerializerOptions { WriteIndented = true }));
-            _logger.LogDebug("FilmWorld Client Headers: {Headers}", 
-                JsonSerializer.Serialize(_filmWorldClient.DefaultRequestHeaders, 
+            _logger.LogDebug("FilmWorld Client Headers: {Headers}",
+                JsonSerializer.Serialize(_filmWorldClient.DefaultRequestHeaders,
                 new JsonSerializerOptions { WriteIndented = true }));
         }
 
-        public async Task<List<MovieComparison>> GetMoviesAsync()
+        public async Task<List<MovieComparison>> GetMoviesAsync(IHttpContextAccessor httpContextAccessor)
         {
             const string cacheKey = "AllMovies";
-            
+
             if (_cache.TryGetValue(cacheKey, out List<MovieComparison>? cachedMovies) && cachedMovies != null)
             {
                 _logger.LogInformation("Returning cached movies:");
@@ -49,8 +50,18 @@ namespace wj_api.Services
                 return cachedMovies;
             }
 
-            var cinemaWorldMovies = await FetchMoviesAsync(_cinemaWorldClient, "cinemaworld");
-            var filmWorldMovies = await FetchMoviesAsync(_filmWorldClient, "filmworld");
+            var token = httpContextAccessor.HttpContext?.Request.Headers["x-access-token"].FirstOrDefault();
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No x-access-token provided in request headers.");
+            }
+            else
+            {
+                _logger.LogDebug("Using x-access-token: {Token}", token);
+            }
+
+            var cinemaWorldMovies = await FetchMoviesAsync(_cinemaWorldClient, "cinemaworld", token);
+            var filmWorldMovies = await FetchMoviesAsync(_filmWorldClient, "filmworld", token);
 
             // Group movies by title
             var allTitles = cinemaWorldMovies.Select(m => m.Title)
@@ -82,15 +93,25 @@ namespace wj_api.Services
             return comparisons;
         }
 
-        public async Task<MovieComparison> CompareMovieAsync(string cinemaWorldId, string filmWorldId)
+        public async Task<MovieComparison> CompareMovieAsync(string cinemaWorldId, string filmWorldId, IHttpContextAccessor httpContextAccessor)
         {
             if (string.IsNullOrEmpty(cinemaWorldId) || string.IsNullOrEmpty(filmWorldId))
             {
                 throw new ArgumentException("Both CinemaWorld and FilmWorld IDs must be provided.");
             }
 
-            var cinemaWorldMovie = await FetchMovieDetailsAsync(_cinemaWorldClient, "cinemaworld", cinemaWorldId);
-            var filmWorldMovie = await FetchMovieDetailsAsync(_filmWorldClient, "filmworld", filmWorldId);
+            var token = httpContextAccessor.HttpContext?.Request.Headers["x-access-token"].FirstOrDefault();
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No x-access-token provided in request headers.");
+            }
+            else
+            {
+                _logger.LogDebug("Using x-access-token: {Token}", token);
+            }
+
+            var cinemaWorldMovie = await FetchMovieDetailsAsync(_cinemaWorldClient, "cinemaworld", cinemaWorldId, token);
+            var filmWorldMovie = await FetchMovieDetailsAsync(_filmWorldClient, "filmworld", filmWorldId, token);
 
             if (cinemaWorldMovie == null && filmWorldMovie == null)
             {
@@ -125,19 +146,23 @@ namespace wj_api.Services
             return comparison;
         }
 
-        private async Task<List<Movie>> FetchMoviesAsync(HttpClient client, string provider)
+        private async Task<List<Movie>> FetchMoviesAsync(HttpClient client, string provider, string? token)
         {
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
-                .WaitAndRetryAsync(3, retryAttempt => 
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
             try
             {
                 return await retryPolicy.ExecuteAsync(async () =>
                 {
                     _logger.LogDebug("Sending request to {Provider} API for movie list", provider);
-                    var response = await client.GetAsync("movies");
+                    var request = new HttpRequestMessage(HttpMethod.Get, "movies");
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        request.Headers.Add("x-access-token", token);
+                    }
+                    var response = await client.SendAsync(request);
                     _logger.LogDebug("Movie List Response Status: {Status}", response.StatusCode);
                     Console.WriteLine("Movie List Response: " + await response.Content.ReadAsStringAsync());
                     response.EnsureSuccessStatusCode();
@@ -157,19 +182,23 @@ namespace wj_api.Services
             }
         }
 
-        private async Task<Movie?> FetchMovieDetailsAsync(HttpClient client, string provider, string movieId)
+        private async Task<Movie?> FetchMovieDetailsAsync(HttpClient client, string provider, string movieId, string? token)
         {
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
-                .WaitAndRetryAsync(3, retryAttempt => 
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
             try
             {
                 return await retryPolicy.ExecuteAsync(async () =>
                 {
                     _logger.LogDebug("Fetching details for {Provider} movie {Id}", provider, movieId);
-                    var response = await client.GetAsync($"movie/{movieId}");
+                    var request = new HttpRequestMessage(HttpMethod.Get, $"movie/{movieId}");
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        request.Headers.Add("x-access-token", token);
+                    }
+                    var response = await client.SendAsync(request);
                     _logger.LogDebug("Movie Detail Response Status: {Status}", response.StatusCode);
                     Console.WriteLine($"Movie Detail Response ({movieId}): " + await response.Content.ReadAsStringAsync());
                     response.EnsureSuccessStatusCode();

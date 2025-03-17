@@ -7,19 +7,19 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient("CinemaWorld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/cinemaworld/");
-    client.DefaultRequestHeaders.Add("x-access-token", 
-        builder.Configuration["ApiTokens:ApiKey"]);
+    // client.DefaultRequestHeaders.Add("x-access-token", 
+    //     builder.Configuration["ApiTokens:ApiKey"]);
 });
 
 builder.Services.AddHttpClient("FilmWorld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/filmworld/");
-    client.DefaultRequestHeaders.Add("x-access-token", 
-        builder.Configuration["ApiTokens:ApiKey"]);
+    // client.DefaultRequestHeaders.Add("x-access-token", 
+    //     builder.Configuration["ApiTokens:ApiKey"]);
 });
 
 builder.Services.AddScoped<wj_api.Services.IMovieService, wj_api.Services.MovieService>();
-
+builder.Services.AddHttpContextAccessor();
 // Add CORS policy
 builder.Services.AddCors(options =>
 {

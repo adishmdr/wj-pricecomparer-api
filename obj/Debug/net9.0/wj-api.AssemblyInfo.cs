@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("wj-api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8b55ad1cfd850c5aa9469ead9baec8cb3dee2d85")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eeb51c2786759279fc705fd4ba21a7446679c60f")]
 [assembly: System.Reflection.AssemblyProductAttribute("wj-api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("wj-api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
